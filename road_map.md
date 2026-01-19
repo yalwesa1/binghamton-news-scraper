@@ -3,14 +3,14 @@
 ## Vision & Goals
 
 ### Mission
-Automate the extraction of venue data from wedding marketplace websites using a repeatable, LLM-assisted crawler that outputs structured, validated data for analysis and decision-making.
+Automate the extraction of news stories from Binghamton University's website and generate engaging LinkedIn posts using AI, enabling efficient content distribution for university communications and social media management.
 
 ### Key Objectives
-1. **Efficiency**: Replace manual data collection with automated async crawling
-2. **Accuracy**: Leverage LLM extraction for intelligent parsing of unstructured web content
-3. **Data Quality**: Ensure completeness and eliminate duplicates through validation
-4. **Scalability**: Design for expansion to multiple categories and locations
-5. **Usability**: Provide clean CSV output for immediate use in analytics tools
+1. **Automation**: Replace manual content curation with AI-powered scraping and post generation
+2. **Intelligence**: Leverage LLM (Llama 3.3 70B) for story extraction and LinkedIn content creation
+3. **Quality**: Ensure completeness with validation and deduplication
+4. **Engagement**: Generate professional, hashtag-optimized LinkedIn posts automatically
+5. **Usability**: Provide clean CSV output ready for social media scheduling tools
 
 ---
 
@@ -27,33 +27,33 @@ Automate the extraction of venue data from wedding marketplace websites using a 
 - Report usage statistics
 
 ### 2. Configuration (`config.py`)
-**Purpose**: Centralized settings for crawler behavior  
+**Purpose**: Centralized settings for scraper behavior  
 **Key Settings**:
-- `BASE_URL`: Target website URL
-- `CSS_SELECTOR`: DOM element selector for venue containers
-- `REQUIRED_KEYS`: Fields necessary for a complete venue record
+- `BASE_URL`: Binghamton University News homepage
+- `CSS_SELECTOR`: DOM element selector for news story containers
+- `REQUIRED_KEYS`: Fields necessary for a complete news story record
 
 ### 3. Data Models (`models/venue.py`)
-**Purpose**: Define structured schema for venue data  
+**Purpose**: Define structured schema for news story data  
 **Features**:
 - Pydantic BaseModel for type validation
 - Schema generation for LLM extraction
-- Fields: name, location, price, capacity, rating, reviews, description
+- Fields: story_title, story_category, story_summary, story_LinkedIn_post
 
 ### 4. Scraper Utilities (`utils/scraper_utils.py`)
-**Purpose**: Configure and execute web crawling operations  
+**Purpose**: Configure and execute web crawling and AI content generation  
 **Key Functions**:
-- `get_browser_config()`: Browser settings (Chromium, headless mode, verbosity)
-- `get_llm_strategy()`: LLM provider setup (Groq/DeepSeek) with extraction instructions
+- `get_browser_config()`: Browser settings with stealth headers for bot evasion
+- `get_llm_strategy()`: LLM provider setup (Groq/Llama 3.3 70B) with LinkedIn post generation instructions
 - `check_no_results()`: Detect end-of-pagination markers
-- `fetch_and_process_page()`: Retrieve, extract, validate, and deduplicate page data
+- `fetch_and_process_page()`: Retrieve, extract stories, generate LinkedIn posts, validate, and deduplicate
 
 ### 5. Data Utilities (`utils/data_utils.py`)
-**Purpose**: Process and persist extracted data  
+**Purpose**: Process and persist extracted news data  
 **Key Functions**:
-- `is_complete_venue()`: Validate presence of required fields
-- `is_duplicate_venue()`: Check against seen venue names
-- `save_venues_to_csv()`: Export validated venues to CSV format
+- `is_complete_venue()`: Validate presence of all required story fields
+- `is_duplicate_venue()`: Check against seen story titles
+- `save_venues_to_csv()`: Export validated news stories with LinkedIn posts to CSV format
 
 ---
 
@@ -62,31 +62,32 @@ Automate the extraction of venue data from wedding marketplace websites using a 
 ### Initialization Phase
 1. Load environment variables from `.env` (Groq API key)
 2. Read configuration from `config.py`
-3. Initialize browser configuration (Chromium, headless mode)
-4. Set up LLM extraction strategy (DeepSeek model via Groq)
+3. Initialize browser configuration with stealth headers
+4. Set up LLM extraction strategy (Llama 3.3 70B via Groq) with LinkedIn post generation
 5. Create async web crawler session
 
-### Crawling Phase (Loop)
-1. Construct URL with current page number
+### Scraping Phase
+1. Construct Binghamton News URL
 2. Check for "No Results Found" message
-   - If found → Exit loop
+   - If found → Exit
    - If not found → Continue
 3. Fetch page with CSS selector and LLM extraction
-4. Parse extracted JSON content
-5. Iterate through extracted venues:
+4. LLM extracts and generates:
+   - Story title, category, and summary
+   - AI-generated LinkedIn post with hashtags (100-150 words)
+5. Parse extracted JSON content
+6. Iterate through extracted stories:
    - Remove spurious `error=false` flags
-   - Validate required fields
-   - Check for duplicates by name
-   - Add valid venues to collection
-6. Increment page number
-7. Wait 2 seconds (rate limiting)
-8. Repeat until no more results
+   - Validate all required fields
+   - Check for duplicates by story title
+   - Add valid stories to collection
+7. Wait 2 seconds (rate limiting) if pagination exists
 
 ### Output Phase
-1. Check if any venues were collected
-2. Write all venues to `complete_venues.csv`
+1. Check if any news stories were collected
+2. Write all stories to `binghamton_news_stories.csv`
 3. Display LLM usage statistics (tokens, cost, etc.)
-4. Log completion summary
+4. Log completion summary with story count
 
 ---
 
@@ -173,96 +174,96 @@ Automate the extraction of venue data from wedding marketplace websites using a 
 
 ## Roadmap & Milestones
 
-### Phase 1: MVP (Current) ✅
+### Phase 1: Binghamton News Scraper (Current) ✅
 **Status**: Complete  
 **Features**:
 - ✅ Async web crawling with Crawl4AI
-- ✅ LLM-powered data extraction
+- ✅ LLM-powered news extraction (Llama 3.3 70B)
+- ✅ AI-generated LinkedIn posts with hashtags
 - ✅ Pydantic schema validation
-- ✅ Pagination handling
-- ✅ Duplicate detection by venue name
-- ✅ CSV export
-- ✅ Basic error handling
+- ✅ Story categorization (Arts & Culture, Health, Science & Technology, etc.)
+- ✅ Duplicate detection by story title
+- ✅ CSV export with complete story data
+- ✅ Comprehensive documentation (SET_UP.md, road_map.md, flow charts)
+- ✅ Bot evasion with stealth headers
 
-**Limitations**:
-- Single target URL
-- Print-based logging
-- Fixed CSS selector
-- Name-only deduplication
-- No retry logic
-
----
-
-### Phase 2: Reliability & Observability 🔄
-**Target**: Enhanced production readiness  
-**Planned Features**:
-- [ ] Structured logging (Python `logging` module)
-- [ ] Retry logic with exponential backoff
-- [ ] Per-page metrics (duration, success rate)
-- [ ] Error categorization and reporting
-- [ ] Progress bars for user feedback
-- [ ] Health checks and monitoring hooks
-- [ ] Configurable timeout settings
-
-**Benefits**:
-- Better debugging and troubleshooting
-- Resilience to transient failures
-- Operational visibility
+**Current Capabilities**:
+- Extracts 13+ stories per run from Binghamton University News
+- Generates professional LinkedIn posts automatically
+- Ready-to-use CSV output for social media scheduling
 
 ---
 
-### Phase 3: Data Quality & Validation 📊
-**Target**: Improved accuracy and consistency  
+### Phase 2: Multi-Source & Scheduling 🔄
+**Target**: Expand to multiple news sources and automate posting  
 **Planned Features**:
-- [ ] Enhanced venue deduplication (fuzzy matching, address comparison)
-- [ ] Price normalization and parsing (extract numeric values, currency)
-- [ ] Capacity normalization (handle ranges, multiple values)
-- [ ] Rating validation (ensure 0-5 scale)
-- [ ] Description quality checks (min/max length, language detection)
-- [ ] Schema versioning for data evolution
-- [ ] Custom validation rules per field
+- [ ] Multi-university support (SUNY schools, Ivy League, etc.)
+- [ ] Scheduled scraping (daily, weekly runs)
+- [ ] Direct LinkedIn API integration for posting
+- [ ] Email notifications with story summaries
+- [ ] Database storage (SQLite/PostgreSQL) for history tracking
+- [ ] Web dashboard for monitoring and management
 
 **Benefits**:
-- Higher quality output data
-- Easier downstream analysis
-- Reduced manual cleanup
+- Centralized news aggregation across multiple sources
+- Fully automated content pipeline
+- Historical tracking and analytics
 
 ---
 
-### Phase 4: Scale & Extensibility 🚀
-**Target**: Multi-source, high-volume crawling  
+### Phase 3: AI Enhancement & Analytics 📊
+**Target**: Smarter content generation and insights  
 **Planned Features**:
-- [ ] Multi-category support (multiple venue types)
-- [ ] Multi-location support (cities, regions, countries)
-- [ ] Parallel page crawling with rate limiting
-- [ ] Database storage (PostgreSQL, MongoDB) as alternative to CSV
-- [ ] JSON output option
-- [ ] Incremental updates (only fetch new/changed venues)
-- [ ] Configurable LLM providers (OpenAI, Anthropic, local models)
-- [ ] Plugin architecture for custom extractors
+- [ ] Sentiment analysis on news stories
+- [ ] Trending topics detection across universities
+- [ ] Multiple LinkedIn post variations (casual, professional, academic)
+- [ ] Automatic image generation for posts (DALL-E, Stable Diffusion)
+- [ ] Story engagement prediction (which stories will perform best)
+- [ ] A/B testing for post formats
+- [ ] Analytics dashboard with story performance metrics
 
 **Benefits**:
-- Handle larger datasets
-- Flexibility for different use cases
-- Reusable across projects
+- More engaging social media content
+- Data-driven content strategy
+- Better understanding of audience preferences
 
 ---
 
-### Phase 5: Intelligence & Enrichment 🧠
-**Target**: Add analytical capabilities  
+### Phase 4: Enterprise Features 🚀
+**Target**: Production-ready for university communications teams  
 **Planned Features**:
-- [ ] Sentiment analysis on reviews
-- [ ] Category classification (luxury, budget, outdoor, etc.)
-- [ ] Price prediction models
-- [ ] Venue recommendation engine
-- [ ] Geographic clustering and mapping
-- [ ] Trend analysis over time
-- [ ] Integration with external data sources (Google Places, Yelp)
+- [ ] Multi-user authentication and permissions
+- [ ] Content approval workflow (draft → review → publish)
+- [ ] Template library for different post styles
+- [ ] Brand voice customization per institution
+- [ ] Compliance checks (verify information, fact-checking)
+- [ ] Integration with content calendars (Hootsuite, Buffer)
+- [ ] Mobile app for on-the-go management
+- [ ] API for third-party integrations
 
 **Benefits**:
-- Transform raw data into insights
-- Support decision-making workflows
-- Create competitive intelligence
+- Enterprise-grade content management
+- Team collaboration features
+- Scalable for multiple departments
+
+---
+
+### Phase 5: Intelligence & Innovation 🧠
+**Target**: Advanced AI capabilities  
+**Planned Features**:
+- [ ] Multi-lingual support (translate stories and posts)
+- [ ] Video script generation for TikTok/Instagram Reels
+- [ ] Podcast episode notes from news stories
+- [ ] Newsletter generation with story roundups
+- [ ] Press release drafting from news stories
+- [ ] Alumni engagement content (personalized by graduation year/major)
+- [ ] Chatbot for answering questions about news stories
+- [ ] Predictive content recommendations
+
+**Benefits**:
+- Multi-channel content distribution
+- Personalized engagement strategies
+- AI-powered communications suite
 
 ---
 

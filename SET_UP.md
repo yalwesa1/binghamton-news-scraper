@@ -1,7 +1,7 @@
 # SET_UP.md
 
 ## Overview
-This project is an async Python web crawler that uses Crawl4AI plus an LLM extraction strategy to collect wedding reception venue data and save it to CSV.
+This project is an AI-powered web scraper that extracts news stories from Binghamton University's website and generates engaging LinkedIn posts using Llama 3.3 70B via Groq API.
 
 ---
 
@@ -18,8 +18,8 @@ Optional:
 
 ## 1. Clone the repo
 ```bash
-git clone <repo-url>
-cd deepseek-ai-web-crawler
+git clone https://github.com/yalwesa1/binghamton-news-scraper.git
+cd binghamton-news-scraper
 ```
 
 ---
@@ -28,8 +28,8 @@ cd deepseek-ai-web-crawler
 
 ### Option A: Conda (Recommended)
 ```bash
-conda create -n deep-seek-crawler python=3.12 -y
-conda activate deep-seek-crawler
+conda create -n binghamton-news python=3.12 -y
+conda activate binghamton-news
 ```
 
 ### Option B: venv
@@ -83,7 +83,7 @@ pip freeze > requirements.txt
 ---
 
 ## 4. Environment Variables
-Create a `.env` file in the project root (`deepseek-ai-web-crawler/`):
+Create a `.env` file in the project root (`binghamton-news-scraper/`):
 
 ```env
 GROQ_API_KEY=your_groq_api_key_here
@@ -100,53 +100,56 @@ GROQ_API_KEY=your_groq_api_key_here
 
 ---
 
-## 5. Configure Crawl Targets (Optional)
-Edit `config.py` to customize the crawler behavior:
-- **`BASE_URL`**: The URL of the website to scrape
-- **`CSS_SELECTOR`**: CSS selector to target venue content
-- **`REQUIRED_KEYS`**: List of required fields for a venue to be considered complete
+## 5. Configure Scraper (Optional)
+Edit `config.py` to customize the scraper behavior:
+- **`BASE_URL`**: The URL of the news website to scrape
+- **`CSS_SELECTOR`**: CSS selector to target news story containers
+- **`REQUIRED_KEYS`**: List of required fields for a complete news story
 
-Example:
+Current Configuration:
 ```python
-BASE_URL = "https://www.theknot.com/marketplace/wedding-reception-venues-atlanta-ga"
-CSS_SELECTOR = "[class^='info-container']"
+BASE_URL = "https://www.binghamton.edu/news/home"
+CSS_SELECTOR = "article, .story, .news-item"
 REQUIRED_KEYS = [
-    "name",
-    "price",
-    "location",
-    "capacity",
-    "rating",
-    "reviews",
-    "description",
+    "story_title",
+    "story_category",
+    "story_summary",
+    "story_LinkedIn_post",
 ]
 ```
 
 ---
 
-## 6. Run the Crawler
+## 6. Run the Scraper
 ```bash
 python main.py
 ```
 
 **What happens:**
-- The crawler will open a browser window (headless mode is disabled by default)
-- It will iterate through pages on the configured website
-- Extract venue data using the LLM strategy
+- The scraper will open a browser window (headless mode is disabled by default)
+- It will fetch Binghamton University News homepage
+- Extract news stories using Llama 3.3 70B LLM
+- Generate LinkedIn posts for each story with hashtags
 - Validate and deduplicate the results
-- Save complete venues to `complete_venues.csv`
-- Display LLM usage statistics
+- Save stories to `binghamton_news_stories.csv`
+- Display LLM usage statistics (tokens used, cost)
 
 **Output:**
-- `complete_venues.csv` in the project root directory
+- `binghamton_news_stories.csv` with columns:
+  - `story_title` - News headline
+  - `story_category` - Story category
+  - `story_summary` - 2-3 sentence summary
+  - `story_LinkedIn_post` - AI-generated post with hashtags
 
 ---
 
 ## 7. Testing & Verification
-After running the crawler:
-1. Check that `complete_venues.csv` was created
-2. Verify the CSV contains the expected columns (name, price, location, etc.)
+After running the scraper:
+1. Check that `binghamton_news_stories.csv` was created
+2. Verify the CSV contains all 4 columns (story_title, story_category, story_summary, story_LinkedIn_post)
 3. Review the console output for any errors or warnings
 4. Check the LLM usage statistics to monitor API consumption
+5. Review the LinkedIn posts generated - they should be 100-150 words with relevant hashtags
 
 ---
 
@@ -161,9 +164,10 @@ After running the crawler:
 - **Rate limiting**: Adjust the sleep time in `main.py` (line 62) to increase delays between requests
 
 ### Data Issues
-- **No venues extracted**: Check if the CSS selector matches the target website's structure
-- **Incomplete venues**: Review `REQUIRED_KEYS` in `config.py` - some fields may not always be available
-- **Duplicates**: The system uses venue names for deduplication; adjust logic in `utils/data_utils.py` if needed
+- **No stories extracted**: Check if the CSS selector matches the target website's structure
+- **Incomplete stories**: Review `REQUIRED_KEYS` in `config.py` - ensure all 4 fields are being extracted
+- **Duplicates**: The system uses story titles for deduplication; adjust logic in `utils/data_utils.py` if needed
+- **Poor LinkedIn posts**: Customize the LLM instructions in `utils/scraper_utils.py` line 40-50
 
 ### Dependencies Issues
 - **Import errors**: Ensure all dependencies are installed: `pip list`
@@ -174,30 +178,35 @@ After running the crawler:
 
 ## 9. Project Structure
 ```
-deepseek-ai-web-crawler/
-├── main.py                 # Main entry point
-├── config.py              # Configuration constants
-├── requirements.txt       # Python dependencies
-├── .env                   # Environment variables (create this)
-├── .gitignore            # Git ignore rules
-├── README.MD             # Project documentation
+binghamton-news-scraper/
+├── main.py                    # Main entry point
+├── config.py                  # Configuration for Binghamton News
+├── requirements.txt           # Python dependencies
+├── .env                       # Environment variables (create this)
+├── .gitignore                # Git ignore rules
+├── README.MD                 # Project documentation
+├── SET_UP.md                 # This file
+├── road_map.md               # Project roadmap
+├── generate_flow_chart.md   # 15 Mermaid diagrams
+├── git_workflow_commit.md   # Git best practices
 ├── models/
 │   ├── __init__.py
-│   └── venue.py          # Pydantic Venue model
+│   └── venue.py              # News Story Pydantic model
 └── utils/
     ├── __init__.py
-    ├── scraper_utils.py  # Crawler configuration & extraction
-    └── data_utils.py     # Data processing & CSV export
+    ├── scraper_utils.py      # Scraper config & LinkedIn post generation
+    └── data_utils.py         # Data validation & CSV export
 ```
 
 ---
 
 ## 10. Development Tips
 - **Logging**: The project uses print statements. Consider integrating Python's `logging` module for production
-- **Browser Mode**: Set `headless=True` in `utils/scraper_utils.py` for background operation
-- **Rate Limiting**: Adjust sleep duration in `main.py` to be respectful of target websites
-- **Data Validation**: Extend the Venue model in `models/venue.py` with additional validation rules
-- **Multiple Sources**: Modify `config.py` or create multiple config files for different crawl targets
+- **Browser Mode**: Set `headless=True` in `utils/scraper_utils.py` line 27 for background operation
+- **Rate Limiting**: Adjust sleep duration in `main.py` line 62 to be respectful of target websites
+- **Customize LinkedIn Posts**: Modify LLM instructions in `utils/scraper_utils.py` to change post style/length
+- **Multiple Sources**: Update `BASE_URL` in `config.py` to scrape different news websites
+- **Add Fields**: Extend the News Story model in `models/venue.py` with additional fields (e.g., publish_date, author)
 
 ---
 
