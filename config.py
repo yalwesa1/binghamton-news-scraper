@@ -7,6 +7,7 @@ REQUIRED_KEYS = [
     "story_title",
     "story_category",
     "story_summary",
+    "story_url",
     "story_LinkedIn_post",
 ]
 

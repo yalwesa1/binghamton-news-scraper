@@ -10,4 +10,5 @@ class Venue(BaseModel):
     story_title: str
     story_category: str
     story_summary: str
+    story_url: str
     story_LinkedIn_post: str

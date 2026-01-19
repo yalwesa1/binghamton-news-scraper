@@ -63,8 +63,11 @@ def get_llm_strategy() -> LLMExtractionStrategy:
             "1. story_title: The headline or title of the news story\n"
             "2. story_category: The category or topic (e.g., 'Arts & Culture', 'Athletics', 'Business', 'Health', 'Science & Technology', 'Campus News', etc.)\n"
             "3. story_summary: A brief 2-3 sentence summary of the story\n"
-            "4. story_LinkedIn_post: Create an engaging LinkedIn post (100-150 words) about this story that would be suitable for sharing on social media. "
-            "Include relevant hashtags and make it professional yet engaging.\n\n"
+            "4. story_url: The complete URL link to the full story. Must be a valid URL starting with https://. "
+            "If you find a relative URL (e.g., /news/story), convert it to absolute by adding https://www.binghamton.edu prefix.\n"
+            "5. story_LinkedIn_post: Create an engaging LinkedIn post (100-150 words) about this story that would be suitable for sharing on social media. "
+            "Include relevant hashtags and make it professional yet engaging. "
+            "At the END of the post, add a new line and include: '🔗 Read more: [story_url]' where [story_url] is the actual URL from field 4.\n\n"
             "Return as many news stories as you can find in the content."
         ),  # Instructions for the LLM
         input_format="markdown",  # Format of the input content
@@ -170,6 +173,30 @@ async def fetch_and_process_page(
     if not extracted_data:
         print(f"No news stories found on page {page_number}.")
         return [], False
+
+    # Handle cases where LLM returns data in a nested 'content' array
+    if isinstance(extracted_data, list) and len(extracted_data) > 0:
+        if isinstance(extracted_data[0], dict) and 'content' in extracted_data[0]:
+            # Extract and parse JSON strings from content array
+            content_array = extracted_data[0]['content']
+            parsed_stories = []
+            for json_str in content_array:
+                try:
+                    # Clean the JSON string (remove control characters that break JSON parsing)
+                    # Replace literal \n in strings with space
+                    cleaned_json = json_str.replace('\n    ', ' ').replace('\n', ' ')
+                    story = json.loads(cleaned_json)
+                    parsed_stories.append(story)
+                except json.JSONDecodeError as e:
+                    print(f"Warning: Could not parse story JSON: {e}")
+                    # Try to parse with strict=False as fallback
+                    try:
+                        story = json.loads(json_str, strict=False)
+                        parsed_stories.append(story)
+                    except:
+                        continue
+            extracted_data = parsed_stories
+            print(f"Parsed {len(extracted_data)} stories from content array")
 
     # After parsing extracted content
     print("Extracted data:", extracted_data)
