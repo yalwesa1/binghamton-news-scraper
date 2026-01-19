@@ -16,9 +16,10 @@ from utils.scraper_utils import (
 load_dotenv()
 
 
-async def crawl_venues():
+async def crawl_venues() -> list:
     """
     Main function to crawl venue data from the website.
+    Returns list of stories for use by dashboard or CLI.
     """
     # Initialize configurations
     browser_config = get_browser_config()
@@ -61,22 +62,34 @@ async def crawl_venues():
             # Pause between requests to be polite and avoid rate limits
             await asyncio.sleep(2)  # Adjust sleep time as needed
 
-    # Save the collected stories to a CSV file
-    if all_venues:
-        save_venues_to_csv(all_venues, "binghamton_news_stories.csv")
-        print(f"Saved {len(all_venues)} news stories to 'binghamton_news_stories.csv'.")
-    else:
-        print("No news stories were found during the crawl.")
-
     # Display usage statistics for the LLM strategy
     llm_strategy.show_usage()
+    
+    # Return the stories for use by dashboard or other tools
+    return all_venues
 
 
 async def main():
     """
-    Entry point of the script.
+    Entry point of the script for CLI usage.
     """
-    await crawl_venues()
+    stories = await crawl_venues()
+    
+    # Save the collected stories to a CSV file
+    if stories:
+        save_venues_to_csv(stories, "binghamton_news_stories.csv")
+        print(f"Saved {len(stories)} news stories to 'binghamton_news_stories.csv'.")
+    else:
+        print("No news stories were found during the crawl.")
+    
+    return stories
+
+
+def run_scraper():
+    """
+    Synchronous wrapper for async scraper - used by Streamlit dashboard.
+    """
+    return asyncio.run(crawl_venues())
 
 
 if __name__ == "__main__":

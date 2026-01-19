@@ -1,3 +1,9 @@
 Crawl4AI
 python-dotenv
 pydantic
+streamlit>=1.30.0
+pandas>=2.0.0
+plotly>=5.18.0
+wordcloud>=1.9.3
+Pillow>=10.0.0
+pyperclip>=1.8.2
