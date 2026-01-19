@@ -61,12 +61,12 @@ async def crawl_venues():
             # Pause between requests to be polite and avoid rate limits
             await asyncio.sleep(2)  # Adjust sleep time as needed
 
-    # Save the collected venues to a CSV file
+    # Save the collected stories to a CSV file
     if all_venues:
-        save_venues_to_csv(all_venues, "complete_venues.csv")
-        print(f"Saved {len(all_venues)} venues to 'complete_venues.csv'.")
+        save_venues_to_csv(all_venues, "binghamton_news_stories.csv")
+        print(f"Saved {len(all_venues)} news stories to 'binghamton_news_stories.csv'.")
     else:
-        print("No venues were found during the crawl.")
+        print("No news stories were found during the crawl.")
 
     # Display usage statistics for the LLM strategy
     llm_strategy.show_usage()

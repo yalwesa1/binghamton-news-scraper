@@ -3,13 +3,11 @@ from pydantic import BaseModel
 
 class Venue(BaseModel):
     """
-    Represents the data structure of a Venue.
+    Represents the data structure of a News Story from Binghamton University.
+    All fields are required for complete story extraction.
     """
 
-    name: str
-    location: str
-    price: str
-    capacity: str
-    rating: float
-    reviews: int
-    description: str
+    story_title: str
+    story_category: str
+    story_summary: str
+    story_LinkedIn_post: str

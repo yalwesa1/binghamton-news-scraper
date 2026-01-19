@@ -16,7 +16,7 @@ from utils.data_utils import is_complete_venue, is_duplicate_venue
 
 def get_browser_config() -> BrowserConfig:
     """
-    Returns the browser configuration for the crawler.
+    Returns the browser configuration for the crawler with stealth settings.
 
     Returns:
         BrowserConfig: The configuration settings for the browser.
@@ -26,6 +26,22 @@ def get_browser_config() -> BrowserConfig:
         browser_type="chromium",  # Type of browser to simulate
         headless=False,  # Whether to run in headless mode (no GUI)
         verbose=True,  # Enable verbose logging
+        # Stealth settings to avoid bot detection
+        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        headers={
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Cache-Control": "max-age=0",
+        },
+        viewport_width=1920,
+        viewport_height=1080,
     )
 
 
@@ -38,14 +54,18 @@ def get_llm_strategy() -> LLMExtractionStrategy:
     """
     # https://docs.crawl4ai.com/api/strategies/#llmextractionstrategy
     return LLMExtractionStrategy(
-        provider="groq/deepseek-r1-distill-llama-70b",  # Name of the LLM provider
+        provider="groq/llama-3.3-70b-versatile",  # Name of the LLM provider (updated from deprecated model)
         api_token=os.getenv("GROQ_API_KEY"),  # API token for authentication
         schema=Venue.model_json_schema(),  # JSON schema of the data model
         extraction_type="schema",  # Type of extraction to perform
         instruction=(
-            "Extract all venue objects with 'name', 'location', 'price', 'capacity', "
-            "'rating', 'reviews', and a 1 sentence description of the venue from the "
-            "following content."
+            "Extract all news stories from the Binghamton University news page. For each story, provide:\n"
+            "1. story_title: The headline or title of the news story\n"
+            "2. story_category: The category or topic (e.g., 'Arts & Culture', 'Athletics', 'Business', 'Health', 'Science & Technology', 'Campus News', etc.)\n"
+            "3. story_summary: A brief 2-3 sentence summary of the story\n"
+            "4. story_LinkedIn_post: Create an engaging LinkedIn post (100-150 words) about this story that would be suitable for sharing on social media. "
+            "Include relevant hashtags and make it professional yet engaging.\n\n"
+            "Return as many news stories as you can find in the content."
         ),  # Instructions for the LLM
         input_format="markdown",  # Format of the input content
         verbose=True,  # Enable verbose logging
@@ -74,6 +94,9 @@ async def check_no_results(
         config=CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS,
             session_id=session_id,
+            wait_until="networkidle",  # Wait until network is idle
+            page_timeout=60000,  # Increase timeout to 60 seconds
+            delay_before_return_html=3.0,  # Wait 3 seconds after page load
         ),
     )
 
@@ -132,6 +155,9 @@ async def fetch_and_process_page(
             extraction_strategy=llm_strategy,  # Strategy for data extraction
             css_selector=css_selector,  # Target specific content on the page
             session_id=session_id,  # Unique session ID for the crawl
+            wait_until="networkidle",  # Wait until network is idle
+            page_timeout=60000,  # Increase timeout to 60 seconds
+            delay_before_return_html=3.0,  # Wait 3 seconds after page load
         ),
     )
 
@@ -142,36 +168,38 @@ async def fetch_and_process_page(
     # Parse extracted content
     extracted_data = json.loads(result.extracted_content)
     if not extracted_data:
-        print(f"No venues found on page {page_number}.")
+        print(f"No news stories found on page {page_number}.")
         return [], False
 
     # After parsing extracted content
     print("Extracted data:", extracted_data)
 
-    # Process venues
+    # Process news stories
     complete_venues = []
     for venue in extracted_data:
-        # Debugging: Print each venue to understand its structure
-        print("Processing venue:", venue)
+        # Debugging: Print each story to understand its structure
+        print("Processing story:", venue)
 
         # Ignore the 'error' key if it's False
         if venue.get("error") is False:
             venue.pop("error", None)  # Remove the 'error' key if it's False
 
         if not is_complete_venue(venue, required_keys):
-            continue  # Skip incomplete venues
+            continue  # Skip incomplete stories
 
-        if is_duplicate_venue(venue["name"], seen_names):
-            print(f"Duplicate venue '{venue['name']}' found. Skipping.")
-            continue  # Skip duplicate venues
+        # Check for duplicates using story_title
+        story_title = venue.get("story_title", "")
+        if is_duplicate_venue(story_title, seen_names):
+            print(f"Duplicate story '{story_title}' found. Skipping.")
+            continue  # Skip duplicate stories
 
-        # Add venue to the list
-        seen_names.add(venue["name"])
+        # Add story to the list
+        seen_names.add(story_title)
         complete_venues.append(venue)
 
     if not complete_venues:
-        print(f"No complete venues found on page {page_number}.")
+        print(f"No complete news stories found on page {page_number}.")
         return [], False
 
-    print(f"Extracted {len(complete_venues)} venues from page {page_number}.")
+    print(f"Extracted {len(complete_venues)} news stories from page {page_number}.")
     return complete_venues, False  # Continue crawling
