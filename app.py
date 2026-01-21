@@ -8,500 +8,366 @@ from collections import Counter
 import re
 from wordcloud import WordCloud
 import plotly.express as px
-import plotly.graph_objects as go
-import pyperclip
 import os
+import sys
+import subprocess
 from dotenv import load_dotenv
-
-# Import our scraper
-from main import run_scraper
+import pyperclip
 
 # Load environment variables
 load_dotenv()
 
+# Binghamton University Official Colors
+BU_GREEN = "#005A43"
+BU_WHITE = "#FFFFFF"
+
 # Page configuration
 st.set_page_config(
-    page_title="Binghamton News Dashboard",
-    page_icon="📰",
+    page_title="Binghamton News Feed",
+    page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Custom CSS for Binghamton Branding
+def load_bu_theme():
+    st.markdown(f"""
+    <style>
+        /* Sidebar Styling */
+        [data-testid="stSidebar"] {{
+            background-color: {BU_GREEN};
+            color: white;
+        }}
+        [data-testid="stSidebar"] .stMarkdown, [data-testid="stSidebar"] p {{
+            color: white !important;
+        }}
+        
+        /* Main Page Headers */
+        h1, h2, h3 {{
+            color: {BU_GREEN} !important;
+            font-family: 'Georgia', serif;
+        }}
+        
+        /* Category Sections */
+        .category-header {{
+            background-color: {BU_GREEN};
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            margin-top: 30px;
+            margin-bottom: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }}
+        
+        /* Story Styling */
+        .story-container {{
+            border-bottom: 1px solid #e0e0e0;
+            padding: 20px 0;
+            margin-bottom: 10px;
+        }}
+        .story-title {{
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }}
+        .linkedin-content {{
+            font-size: 16px;
+            color: #444;
+            line-height: 1.6;
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid {BU_GREEN};
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }}
+        
+        /* Link Buttons */
+        .stLinkButton > a {{
+            background-color: {BU_GREEN} !important;
+            color: white !important;
+            border-radius: 5px !important;
+            border: none !important;
+        }}
+        
+        /* Sidebar Buttons - Primary Type */
+        [data-testid="stSidebar"] button[kind="primary"] {{
+            background-color: {BU_GREEN} !important;
+            color: white !important;
+            font-weight: bold !important;
+            border: 2px solid white !important;
+            border-radius: 5px !important;
+        }}
+        
+        [data-testid="stSidebar"] button[kind="primary"]:hover {{
+            background-color: #003d2e !important;
+            border: 2px solid white !important;
+        }}
+        
+        /* Copy Button Styling - Match Link Button */
+        button[kind="primary"] {{
+            background-color: {BU_GREEN} !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 5px !important;
+        }}
+        
+        button[kind="primary"]:hover {{
+            background-color: #003d2e !important;
+        }}
+        
+        /* Dark Mode Adjustments */
+        @media (prefers-color-scheme: dark) {{
+            .linkedin-content {{
+                background-color: #1e1e1e;
+                color: #ddd;
+            }}
+            .story-title {{
+                color: #eee;
+            }}
+        }}
+    </style>
+    """, unsafe_allow_html=True)
+
+load_bu_theme()
 
 # Initialize session state
 if 'stories' not in st.session_state:
     st.session_state.stories = []
 if 'last_updated' not in st.session_state:
     st.session_state.last_updated = None
-if 'is_loading' not in st.session_state:
-    st.session_state.is_loading = False
-if 'dark_mode' not in st.session_state:
-    st.session_state.dark_mode = False
 if 'history' not in st.session_state:
     st.session_state.history = []
 
-# Custom CSS for styling
-def load_css():
-    mode_colors = {
-        'bg': '#0E1117' if st.session_state.dark_mode else '#FFFFFF',
-        'card_bg': '#262730' if st.session_state.dark_mode else '#F0F2F6',
-        'text': '#FAFAFA' if st.session_state.dark_mode else '#262730',
-        'border': '#4A4A4A' if st.session_state.dark_mode else '#E0E0E0'
-    }
-    
-    st.markdown(f"""
-    <style>
-        .story-card {{
-            background-color: {mode_colors['card_bg']};
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            height: 100%;
-            border: 1px solid {mode_colors['border']};
-        }}
-        .story-title {{
-            font-size: 18px;
-            font-weight: bold;
-            color: #1f77b4;
-            margin-bottom: 10px;
-        }}
-        .story-category {{
-            display: inline-block;
-            background-color: #4CAF50;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 12px;
-            margin-bottom: 10px;
-        }}
-        .linkedin-post {{
-            font-size: 14px;
-            color: {mode_colors['text']};
-            line-height: 1.6;
-            margin-top: 10px;
-            padding: 15px;
-            background-color: {mode_colors['bg']};
-            border-left: 3px solid #0077B5;
-            border-radius: 5px;
-        }}
-        .analytics-box {{
-            background-color: {mode_colors['card_bg']};
-            padding: 15px;
-            border-radius: 8px;
-            margin: 10px 0;
-            border: 1px solid {mode_colors['border']};
-        }}
-        .metric-value {{
-            font-size: 24px;
-            font-weight: bold;
-            color: #1f77b4;
-        }}
-        .copy-notification {{
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 10px 0;
-            text-align: center;
-        }}
-    </style>
-    """, unsafe_allow_html=True)
-
-load_css()
-
 # Helper functions
 def load_existing_stories():
-    """Load stories from CSV if available"""
     csv_path = Path("binghamton_news_stories.csv")
     if csv_path.exists():
         try:
             df = pd.read_csv(csv_path)
             return df.to_dict('records')
         except Exception as e:
-            st.error(f"Error loading stories: {e}")
             return []
     return []
 
-def extract_keywords(stories, top_n=20):
-    """Extract most common keywords from stories"""
-    # Combine all summaries and titles
-    text = " ".join([s.get('story_summary', '') + " " + s.get('story_title', '') for s in stories])
+def run_scraper_subprocess():
+    """
+    Run the scraper as a subprocess - avoids event loop conflicts on Windows.
+    The scraper runs in its own Python process with a clean event loop.
+    """
+    # Get the path to the main.py file
+    script_dir = Path(__file__).parent
+    main_py = script_dir / "main.py"
     
-    # Remove common words
-    stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'is', 'are', 'was', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'that', 'this', 'these', 'those', 'with', 'from', 'as', 'by'}
+    # Run main.py as a subprocess
+    # Use the same Python interpreter that's running Streamlit
+    python_exe = sys.executable
+    env = os.environ.copy()
     
-    # Extract words
-    words = re.findall(r'\b[a-z]{4,}\b', text.lower())
-    filtered_words = [w for w in words if w not in stop_words]
+    # Set UTF-8 encoding for Windows console
+    env['PYTHONIOENCODING'] = 'utf-8'
     
-    # Count frequencies
-    word_counts = Counter(filtered_words)
-    return word_counts.most_common(top_n)
-
-def calculate_text_stats(stories):
-    """Calculate text statistics"""
-    if not stories:
-        return {}
-    
-    summaries = [len(s.get('story_summary', '')) for s in stories]
-    posts = [len(s.get('story_LinkedIn_post', '')) for s in stories]
-    
-    return {
-        'avg_summary_length': sum(summaries) / len(summaries) if summaries else 0,
-        'avg_post_length': sum(posts) / len(posts) if posts else 0,
-        'total_stories': len(stories)
-    }
-
-def improve_linkedin_post(original_post, story_title, category):
-    """Use LLM to improve LinkedIn post for better engagement"""
     try:
-        from litellm import completion
-        
-        prompt = f"""You are a social media expert specializing in LinkedIn content for universities.
-
-Review this LinkedIn post and make it MORE ENGAGING, STUDENT-FRIENDLY, and ATTRACTIVE.
-
-Story Title: {story_title}
-Category: {category}
-Original Post:
-{original_post}
-
-Guidelines:
-1. Keep it 100-150 words
-2. Make it relatable to students and young professionals
-3. Use engaging language (questions, calls-to-action)
-4. Add 2-3 relevant emojis naturally
-5. Keep all hashtags
-6. Keep the "Read more:" link at the end
-7. Make it exciting and shareable!
-
-Return ONLY the improved post, nothing else."""
-
-        response = completion(
-            model="groq/llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            api_key=os.getenv("GROQ_API_KEY")
+        result = subprocess.run(
+            [python_exe, str(main_py)],
+            cwd=str(script_dir),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=600  # 10 minute timeout
         )
         
-        improved_post = response.choices[0].message.content.strip()
-        return improved_post
+        if result.returncode != 0:
+            raise RuntimeError(f"Scraper failed with return code {result.returncode}\n{result.stderr}")
         
+        # After scraper completes, reload the CSV file
+        return load_existing_stories()
+    
+    except subprocess.TimeoutExpired:
+        raise TimeoutError("Scraper timed out after 10 minutes")
     except Exception as e:
-        st.error(f"Error improving post: {e}")
-        return original_post
+        raise RuntimeError(f"Error running scraper: {str(e)}")
 
-# Load existing stories on first run
+def extract_keywords(stories, top_n=20):
+    text = " ".join([s.get('story_summary', '') + " " + s.get('story_title', '') for s in stories])
+    stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'is', 'are', 'was', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'that', 'this', 'these', 'those', 'with', 'from', 'as', 'by'}
+    words = re.findall(r'\b[a-z]{4,}\b', text.lower())
+    filtered_words = [w for w in words if w not in stop_words]
+    return Counter(filtered_words).most_common(top_n)
+
+# Load existing data
 if not st.session_state.stories:
     st.session_state.stories = load_existing_stories()
     if st.session_state.stories:
         st.session_state.last_updated = datetime.now()
 
-# Sidebar
+# Sidebar (Full BU Green)
 with st.sidebar:
-    st.title("📰 Binghamton News")
-    
-    # Dark mode toggle
-    dark_mode = st.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
-    if dark_mode != st.session_state.dark_mode:
-        st.session_state.dark_mode = dark_mode
-        load_css()
-        st.rerun()
-    
+    st.markdown(f"""
+        <h1 style='color: white; font-size: 20px; text-align: center; margin-bottom: 20px;'>
+            Binghamton University<br>News AI Scraper
+        </h1>
+    """, unsafe_allow_html=True)
     st.markdown("---")
     
-    # Refresh button
-    if st.button("🔄 Refresh Stories", use_container_width=True, type="primary"):
-        st.session_state.is_loading = True
-        with st.spinner("Scraping latest news..."):
+    # User-controlled refresh - runs scraper as subprocess to avoid event loop conflicts
+    if st.button("🔄 REFRESH SCRAPER", key="refresh_btn", type="primary"):
+        with st.spinner("Connecting to BU News... This may take a minute."):
             try:
-                stories = run_scraper()
+                # Run scraper as a subprocess - creates fresh Python process with clean event loop
+                stories = run_scraper_subprocess()
+                
                 if stories:
                     st.session_state.stories = stories
                     st.session_state.last_updated = datetime.now()
-                    
-                    # Save to history
-                    st.session_state.history.append({
-                        'timestamp': datetime.now(),
-                        'count': len(stories),
-                        'categories': [s.get('story_category', 'Unknown') for s in stories]
-                    })
-                    
-                    st.success(f"✅ Loaded {len(stories)} stories!")
+                    st.session_state.history.append({'timestamp': datetime.now(), 'count': len(stories)})
+                    st.success(f"✅ Successfully scraped {len(stories)} stories!")
+                    st.rerun()
                 else:
-                    st.warning("No stories found")
+                    st.warning("⚠️ No stories were found. Please check your connection or try again.")
             except Exception as e:
-                st.error(f"❌ Error: {e}")
-            finally:
-                st.session_state.is_loading = False
-                st.rerun()
+                st.error(f"❌ Error: {str(e)}")
+                st.exception(e)  # Show full traceback for debugging
     
-    # Stats
     st.markdown("---")
-    st.subheader("📊 Statistics")
-    
+    st.markdown("<h3 style='color: white; font-size: 18px;'>📊 Current Scrape Stats</h3>", unsafe_allow_html=True)
     if st.session_state.stories:
-        num_stories = len(st.session_state.stories)
-        categories = list(set(story.get('story_category', 'Unknown') for story in st.session_state.stories))
-        
-        st.metric("Total Stories", num_stories)
-        st.metric("Categories", len(categories))
-        
+        st.markdown(f"<p style='color: white;'>Total Stories: <strong>{len(st.session_state.stories)}</strong></p>", unsafe_allow_html=True)
         if st.session_state.last_updated:
-            time_diff = datetime.now() - st.session_state.last_updated
-            mins_ago = int(time_diff.total_seconds() / 60)
-            time_str = f"{mins_ago} mins ago" if mins_ago < 60 else f"{int(mins_ago/60)} hrs ago"
-            st.metric("Last Updated", time_str)
+            st.markdown(f"<p style='color: white;'>Updated: {st.session_state.last_updated.strftime('%H:%M:%S')}</p>", unsafe_allow_html=True)
     
-    # Export options
     st.markdown("---")
-    st.subheader("⬇️ Export")
-    
+    # Simple Export with dark green styling
     if st.session_state.stories:
-        # Export as CSV
-        df = pd.DataFrame(st.session_state.stories)
-        csv = df.to_csv(index=False).encode('utf-8')
+        csv = pd.DataFrame(st.session_state.stories).to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Download CSV",
-            data=csv,
-            file_name=f"binghamton_news_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-        
-        # Export as JSON
-        json_str = json.dumps(st.session_state.stories, indent=2)
-        st.download_button(
-            label="📥 Download JSON",
-            data=json_str,
-            file_name=f"binghamton_news_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-            mime="application/json",
-            use_container_width=True
+            "📥 Download CSV Report", 
+            data=csv, 
+            file_name="bu_news_report.csv",
+            key="download_csv",
+            type="primary"
         )
 
-# Main content area
-st.title("📰 Binghamton University News Dashboard")
+# Main Content Area - Header with Logo and Title
+col_logo, col_title = st.columns([1, 2])
+with col_logo:
+    # Use the Binghamton logo here. Path should be relative to the root.
+    # If the user saved the logo image as 'logo.png' in the root:
+    if Path("logo.png").exists():
+        st.image("logo.png", width=300)
+    else:
+        # Fallback to text header if logo not found
+        st.markdown(f"<h1 style='color: {BU_GREEN}; margin-top: 0;'>BINGHAMTON</h1>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color: {BU_GREEN}; font-weight: bold;'>STATE UNIVERSITY OF NEW YORK</p>", unsafe_allow_html=True)
+
+with col_title:
+    # Main title
+    st.markdown(f"""
+        <div style='margin-top: 40px;'>
+            <h1 style='color: {BU_GREEN}; font-size: 32px; font-weight: bold; margin-bottom: 10px;'>
+                Smarter AI Scraper: Binghamton University News
+            </h1>
+            <p style='color: #666; font-size: 16px; margin-top: 5px;'>
+                Developed by Yaseen Alwesabi
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+
 st.markdown("---")
 
-# Display stories or prompt
 if not st.session_state.stories:
-    st.info("👋 Click 'Refresh Stories' in the sidebar to load the latest news!")
+    st.info("No data available. Please click 'REFRESH SCRAPER' in the sidebar to begin.")
 else:
-    # Create tabs for different views
-    tab1, tab2, tab3 = st.tabs(["📰 Stories", "📊 Analytics", "💡 Text Insights"])
+    tab1, tab2, tab3 = st.tabs(["📰 NEWS FEED", "📊 CATEGORY ANALYTICS", "💡 TEXT INSIGHTS"])
     
     with tab1:
-        # Category filter
-        all_categories = ['All'] + sorted(set(story.get('story_category', 'Unknown') for story in st.session_state.stories))
-        selected_category = st.selectbox("Filter by category:", all_categories)
+        # Step 1: Group and Sort - ensure all categories are strings
+        grouped_data = {}
+        for s in st.session_state.stories:
+            cat = str(s.get('story_category', 'General'))
+            if cat not in grouped_data:
+                grouped_data[cat] = []
+            grouped_data[cat].append(s)
         
-        # Filter stories
-        filtered_stories = st.session_state.stories
-        if selected_category != 'All':
-            filtered_stories = [s for s in st.session_state.stories if s.get('story_category') == selected_category]
+        # Sort Categories Alphabetically
+        sorted_categories = sorted(grouped_data.keys())
         
-        st.markdown(f"### Showing {len(filtered_stories)} stories")
-        
-        # Display stories in cards
-        card_columns = st.selectbox("Cards per row:", [1, 2, 3], index=1)
-        
-        # Create grid layout
-        rows = (len(filtered_stories) + card_columns - 1) // card_columns
-        
-        for row_idx in range(rows):
-            cols = st.columns(card_columns)
-            for col_idx in range(card_columns):
-                story_idx = row_idx * card_columns + col_idx
-                if story_idx < len(filtered_stories):
-                    story = filtered_stories[story_idx]
+        # Step 2: Display categorized feed
+        for category in sorted_categories:
+            st.markdown(f'<div class="category-header">{category}</div>', unsafe_allow_html=True)
+            
+            # Sort stories in category alphabetically by title
+            category_stories = sorted(grouped_data[category], key=lambda x: x.get('story_title', '').lower())
+            
+            for idx, story in enumerate(category_stories):
+                with st.container():
+                    st.markdown(f'<div class="story-title">{story.get("story_title", "Untitled Story")}</div>', unsafe_allow_html=True)
                     
-                    with cols[col_idx]:
-                        # Story card
-                        with st.container():
-                            st.markdown(f"""
-                            <div class="story-card">
-                                <div class="story-title">{story.get('story_title', 'No Title')}</div>
-                                <span class="story-category">{story.get('story_category', 'Uncategorized')}</span>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            
-                            # Summary
-                            with st.expander("📄 Summary", expanded=False):
-                                st.markdown(f"**{story.get('story_summary', 'No summary available')}**")
-                            
-                            # LinkedIn post
-                            st.markdown("**📱 LinkedIn Post:**")
-                            linkedin_post = story.get('story_LinkedIn_post', 'No post available')
-                            st.markdown(f"""
-                            <div class="linkedin-post">
-                                {linkedin_post}
-                            </div>
-                            """, unsafe_allow_html=True)
-                            
-                            # Action buttons
-                            col1, col2, col3 = st.columns(3)
-                            
-                            with col1:
-                                if st.button("📋 Copy", key=f"copy_{story_idx}", use_container_width=True):
-                                    try:
-                                        # Try using pyperclip
-                                        pyperclip.copy(linkedin_post)
-                                        st.success("✅ Copied!")
-                                    except:
-                                        # Fallback: show text area
-                                        st.text_area("Copy this:", linkedin_post, height=100, key=f"fallback_{story_idx}")
-                            
-                            with col2:
-                                if story.get('story_url'):
-                                    st.link_button("🔗 Read More", story['story_url'], use_container_width=True)
-                            
-                            with col3:
-                                if st.button("✨ Improve", key=f"improve_{story_idx}", use_container_width=True):
-                                    with st.spinner("AI improving post..."):
-                                        improved = improve_linkedin_post(
-                                            linkedin_post,
-                                            story.get('story_title', ''),
-                                            story.get('story_category', '')
-                                        )
-                                        st.session_state[f"improved_{story_idx}"] = improved
-                            
-                            # Show improved version if available
-                            if f"improved_{story_idx}" in st.session_state:
-                                st.markdown("**✨ AI-Improved Version:**")
-                                st.info(st.session_state[f"improved_{story_idx}"])
-                                if st.button("📋 Copy Improved", key=f"copy_improved_{story_idx}"):
-                                    try:
-                                        pyperclip.copy(st.session_state[f"improved_{story_idx}"])
-                                        st.success("✅ Copied improved version!")
-                                    except:
-                                        st.text_area("Copy this:", st.session_state[f"improved_{story_idx}"], height=100)
-    
+                    # Clean LinkedIn post display
+                    post_content = story.get('story_LinkedIn_post', '')
+                    st.markdown(f'<div class="linkedin-content">{post_content}</div>', unsafe_allow_html=True)
+                    
+                    # Buttons: Read More Link + Copy Button
+                    if story.get('story_url'):
+                        col1, col2, col3 = st.columns([3, 1, 6])
+                        with col1:
+                            st.link_button("🔗 Read Details on Binghamton News Site", story['story_url'])
+                        with col2:
+                            if st.button("📋", key=f"copy_{category}_{idx}", help="Copy LinkedIn post", type="primary"):
+                                try:
+                                    # Use Streamlit's session state to trigger copy
+                                    st.session_state[f'copied_{category}_{idx}'] = True
+                                    # Show success message
+                                    st.toast("✅ LinkedIn post copied to clipboard!", icon="✅")
+                                    # Copy to clipboard (note: this works in local environment)
+                                    pyperclip.copy(post_content)
+                                except:
+                                    # Fallback: show the content in a text area for manual copy
+                                    st.info("Copy the text below:")
+                                    st.code(post_content, language=None)
+                    
+                    st.markdown("<div style='margin-bottom: 40px;'></div>", unsafe_allow_html=True)
+
     with tab2:
-        st.subheader("📊 Analytics Dashboard")
+        st.subheader("Binghamton News Distribution")
+        # Ensure all categories are strings for counting
+        category_counts = Counter([str(s.get('story_category', 'Unknown')) for s in st.session_state.stories])
         
-        # Story count over time (if we have history)
-        if len(st.session_state.history) > 1:
-            st.markdown("### 📈 Story Count Over Time")
-            history_df = pd.DataFrame([
-                {'Time': h['timestamp'].strftime('%H:%M'), 'Stories': h['count']}
-                for h in st.session_state.history
-            ])
-            fig_line = px.line(history_df, x='Time', y='Stories', 
-                              title='Stories Scraped Over Time',
-                              markers=True)
-            fig_line.update_layout(height=400)
-            st.plotly_chart(fig_line, use_container_width=True)
-        else:
-            st.info("📈 Story trends will appear after multiple scrapes")
-        
-        # Category distribution
-        st.markdown("### 🎯 Category Distribution")
-        category_counts = Counter([s.get('story_category', 'Unknown') for s in st.session_state.stories])
-        
-        col1, col2 = st.columns([1, 1])
-        
+        col1, col2 = st.columns(2)
         with col1:
-            # Pie chart
-            fig_pie = px.pie(
-                values=list(category_counts.values()),
-                names=list(category_counts.keys()),
-                title='Stories by Category'
-            )
-            fig_pie.update_layout(height=400)
-            st.plotly_chart(fig_pie, use_container_width=True)
-        
+            fig_pie = px.pie(values=list(category_counts.values()), names=list(category_counts.keys()), 
+                            color_discrete_sequence=[BU_GREEN, "#00A3AD", "#85714D", "#000000"],
+                            title="Stories by Category")
+            st.plotly_chart(fig_pie, width='stretch')
         with col2:
-            # Bar chart
-            fig_bar = px.bar(
-                x=list(category_counts.keys()),
-                y=list(category_counts.values()),
-                title='Story Count by Category',
-                labels={'x': 'Category', 'y': 'Count'}
-            )
-            fig_bar.update_layout(height=400)
-            st.plotly_chart(fig_bar, use_container_width=True)
-    
+            fig_bar = px.bar(x=list(category_counts.keys()), y=list(category_counts.values()),
+                            labels={'x': 'Category', 'y': 'Count'},
+                            color_discrete_sequence=[BU_GREEN],
+                            title="Story Volume by Category")
+            st.plotly_chart(fig_bar, width='stretch')
+
     with tab3:
-        st.subheader("💡 Text Insights")
+        st.subheader("Text Insights & Trending Topics")
+        keywords = extract_keywords(st.session_state.stories, top_n=100)
         
-        # Text statistics
-        stats = calculate_text_stats(st.session_state.stories)
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.markdown(f"""
-            <div class="analytics-box">
-                <div>Average Summary Length</div>
-                <div class="metric-value">{stats.get('avg_summary_length', 0):.0f}</div>
-                <div>characters</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown(f"""
-            <div class="analytics-box">
-                <div>Average Post Length</div>
-                <div class="metric-value">{stats.get('avg_post_length', 0):.0f}</div>
-                <div>characters</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            st.markdown(f"""
-            <div class="analytics-box">
-                <div>Total Stories</div>
-                <div class="metric-value">{stats.get('total_stories', 0)}</div>
-                <div>analyzed</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        # Keywords and word cloud
-        col1, col2 = st.columns([1, 1])
-        
-        with col1:
-            st.markdown("### 🔑 Top Keywords")
-            keywords = extract_keywords(st.session_state.stories, top_n=15)
+        if keywords:
+            wordcloud = WordCloud(width=800, height=400, background_color='white', colormap='Greens').generate_from_frequencies(dict(keywords))
+            st.image(wordcloud.to_array(), width='stretch')
             
-            if keywords:
-                # Display as table
-                keywords_df = pd.DataFrame(keywords, columns=['Keyword', 'Frequency'])
-                st.dataframe(keywords_df, use_container_width=True, height=400)
-        
-        with col2:
-            st.markdown("### ☁️ Word Cloud")
-            keywords = extract_keywords(st.session_state.stories, top_n=100)
-            
-            if keywords:
-                # Generate word cloud
-                wordcloud = WordCloud(
-                    width=800, 
-                    height=400,
-                    background_color='white' if not st.session_state.dark_mode else 'black',
-                    colormap='viridis'
-                ).generate_from_frequencies(dict(keywords))
-                
-                st.image(wordcloud.to_array(), use_column_width=True)
-        
-        # Trending topics
-        st.markdown("---")
-        st.markdown("### 📌 Trending Topics This Month")
-        
-        # Get top keywords as trending topics
-        top_keywords = extract_keywords(st.session_state.stories, top_n=8)
-        if top_keywords:
-            # Display as pills/badges
-            topics_html = " ".join([
-                f'<span style="background-color: #1f77b4; color: white; padding: 8px 15px; border-radius: 20px; margin: 5px; display: inline-block;">{kw[0]} ({kw[1]})</span>'
-                for kw in top_keywords
-            ])
-            st.markdown(topics_html, unsafe_allow_html=True)
+            st.markdown("### Top Keywords Found")
+            cols = st.columns(5)
+            for i, (kw, count) in enumerate(extract_keywords(st.session_state.stories, top_n=15)):
+                cols[i % 5].metric(kw, count)
 
 # Footer
 st.markdown("---")
-st.markdown("""
+st.markdown(f"""
 <div style='text-align: center; color: gray; padding: 20px;'>
-    Built with ❤️ for Binghamton University<br>
-    Powered by AI (Llama 3.3 70B) | <a href='https://github.com/yalwesa1/binghamton-news-scraper'>GitHub</a>
+    University News Dashboard | Powered by Llama 3.3 AI<br>
+    <span style='color: {BU_GREEN}; font-weight: bold;'>Binghamton University</span> News Scraper
 </div>
 """, unsafe_allow_html=True)

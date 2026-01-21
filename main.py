@@ -1,4 +1,12 @@
 import asyncio
+import sys
+
+# Fix for Windows event loop policy - MUST be at the VERY TOP before any imports
+# Playwright on Windows requires ProactorEventLoop (NOT SelectorEventLoop)
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
+import platform
 
 from crawl4ai import AsyncWebCrawler
 from dotenv import load_dotenv
@@ -88,9 +96,14 @@ async def main():
 def run_scraper():
     """
     Synchronous wrapper for async scraper - used by Streamlit dashboard.
+    Must use asyncio.run() on Windows (Playwright requires ProactorEventLoop).
     """
+    # Use asyncio.run() - this is the ONLY correct way on Windows
+    # Do NOT manually control the event loop
     return asyncio.run(crawl_venues())
 
 
 if __name__ == "__main__":
+    # Use asyncio.run() - this is the ONLY correct way on Windows
+    # Event loop policy is already set at the top of the file
     asyncio.run(main())

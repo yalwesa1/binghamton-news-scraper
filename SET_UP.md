@@ -26,39 +26,43 @@ cd binghamton-news-scraper
 
 ## 2. Create and activate a virtual environment
 
-### Option A: Conda (Recommended)
+### Option A: uv (Highly Recommended)
+Lightning-fast and isolated environment management.
+```powershell
+# Install uv (if needed)
+pip install uv
+
+# Create environment with Python 3.12
+uv venv --python 3.12
+
+# Activate
+# Windows PowerShell
+.\.venv\Scripts\activate
+# Windows CMD
+.venv\Scripts\activate.bat
+# macOS/Linux
+source .venv/bin/activate
+```
+
+### Option B: Conda
 ```bash
 conda create -n binghamton-news python=3.12 -y
 conda activate binghamton-news
-```
-
-### Option B: venv
-```bash
-python -m venv .venv
-
-# Windows PowerShell
-.venv\Scripts\Activate.ps1
-
-# Windows Command Prompt
-.venv\Scripts\activate.bat
-
-# macOS/Linux
-source .venv/bin/activate
 ```
 
 ---
 
 ## 3. Install dependencies
 
-### Current Requirements
-The project uses the following packages (see `requirements.txt`):
-- **Crawl4AI**: Async web crawling framework with LLM integration
-- **python-dotenv**: Environment variable management from .env files
-- **pydantic**: Data validation and schema modeling
-
-Install all dependencies:
 ```bash
+# Using uv
+uv pip install -r requirements.txt
+uv pip install playwright
+uv run playwright install chromium
+
+# Using standard pip
 pip install -r requirements.txt
+python -m playwright install chromium
 ```
 
 ### Check for Latest Versions
@@ -120,26 +124,34 @@ REQUIRED_KEYS = [
 
 ---
 
-## 6. Run the Scraper
+## 6. Run the Application
+
+### Option 1: Run the Scraper (CLI)
 ```bash
 python main.py
 ```
 
+### Option 2: Run the Dashboard (Streamlit UI)
+```bash
+python -m streamlit run app.py
+```
+
 **What happens:**
-- The scraper will open a browser window (headless mode is disabled by default)
-- It will fetch Binghamton University News homepage
-- Extract news stories using Llama 3.3 70B LLM
-- Generate LinkedIn posts for each story with hashtags
-- Validate and deduplicate the results
-- Save stories to `binghamton_news_stories.csv`
-- Display LLM usage statistics (tokens used, cost)
+- The CLI version saves stories to `binghamton_news_stories.csv`.
+- The Dashboard version provides a beautiful, Binghamton-branded web interface to browse stories, see analytics, and refresh the data.
+- The scraper fetches the Binghamton University News homepage.
+- Extract news stories using Llama 3.3 70B LLM via Groq API.
+- Generate LinkedIn posts for each story with "Read more" links.
+- Validate and deduplicate the results.
+- Save stories to `binghamton_news_stories.csv`.
 
 **Output:**
 - `binghamton_news_stories.csv` with columns:
   - `story_title` - News headline
   - `story_category` - Story category
   - `story_summary` - 2-3 sentence summary
-  - `story_LinkedIn_post` - AI-generated post with hashtags
+  - `story_url` - Link to original article
+  - `story_LinkedIn_post` - AI-generated post with hashtags and link
 
 ---
 

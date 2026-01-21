@@ -8,6 +8,7 @@ from crawl4ai import (
     CacheMode,
     CrawlerRunConfig,
     LLMExtractionStrategy,
+    LLMConfig,
 )
 
 from models.venue import Venue
@@ -54,8 +55,10 @@ def get_llm_strategy() -> LLMExtractionStrategy:
     """
     # https://docs.crawl4ai.com/api/strategies/#llmextractionstrategy
     return LLMExtractionStrategy(
-        provider="groq/llama-3.3-70b-versatile",  # Name of the LLM provider (updated from deprecated model)
-        api_token=os.getenv("GROQ_API_KEY"),  # API token for authentication
+        llm_config=LLMConfig(
+            provider="groq/llama-3.3-70b-versatile",  # Name of the LLM provider
+            api_token=os.getenv("GROQ_API_KEY"),  # API token for authentication
+        ),
         schema=Venue.model_json_schema(),  # JSON schema of the data model
         extraction_type="schema",  # Type of extraction to perform
         instruction=(
