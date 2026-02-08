@@ -1,6 +1,6 @@
 # generate_flow_chart.md
 
-This document contains Mermaid diagrams to visualize the project flow, architecture, and data pipelines of the DeepSeek AI Web Crawler.
+This document contains Mermaid diagrams to visualize the project flow, architecture, and data pipelines of the DeepSeek AI Web Crawler. View this file in **Markdown Preview** (or on GitHub/GitLab) to see the Mermaid charts rendered here.
 
 ---
 
@@ -64,7 +64,7 @@ flowchart TD
     LoadConfig --> InitBrowser[Initialize BrowserConfig<br/>browser_type: chromium<br/>headless: False<br/>verbose: True]
     InitBrowser --> InitLLM[Initialize LLMExtractionStrategy<br/>provider: groq/deepseek-r1-distill-llama-70b<br/>schema: Venue model<br/>extraction_type: schema]
     InitLLM --> CreateSession[Create AsyncWebCrawler session]
-    CreateSession --> InitVars[Initialize state variables<br/>page_number = 1<br/>all_venues = []<br/>seen_names = set]
+    CreateSession --> InitVars[Initialize state variables<br/>page_number = 1<br/>all_venues = empty list<br/>seen_names = set]
     
     InitVars --> BuildURL[Build URL with page number<br/>BASE_URL?page=N]
     BuildURL --> CheckNoResults{Check for<br/>'No Results Found'<br/>message}
